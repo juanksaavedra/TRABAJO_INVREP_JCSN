@@ -1,0 +1,82 @@
+---
+title: "Trabajo Curso: Investigacion Reproducible con R"
+author:
+- familyname: Juan Carlos
+  othernames: Saavedra-Nievas
+  qualifications: PhD
+email: juancarlos.saavedra@ifop.cl
+department: Division de\newline  Investigacion\newline Pesquera
+organization: Universidad Tecnica Federico Santa Maria
+lang: es
+number-sections: true
+fig-height: 5
+fig-width: 8
+cite-method: biblatex
+bibliography: biblio.bib
+biblio-style: authoryear-comp
+linestretch: 1.5
+format: report-pdf
+month: Agosto
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+# Introduccion
+
+<!--# In a famous paper, @BC64 introduced a family of transformations \dots -->
+
+Los datos provenientes del muestreo biologico de la longitud y el peso de los individuos, permite observar caracteristicas de crecimiento de las especies. @Jellyman2013 considera que la importancia de esta relacion es informacion fundamental para los cientificos que intentan deducir la estructura de edad, calcular las tasas de crecimiento o cuantificar algun otro aspecto de la dinamica de la poblacion. En los estudios asociados al regimen de Areas de Manejo y Explotacion de Recursos Bentonicos (AMERB), es habitual el uso de relaciones longitud-peso para estimar el peso medio con base en la talla y utilizarlo para convertir la abundancia estimada a la longitud en biomasa a la longitud en la especie evaluada, por lo cual, la validación de los datos registrados de peso y longitud es de suma importancia.
+
+En linea con lo señalado, se propone e implementa una metodología que permite generar un validador para los datos utilizados en el modelado de la relación longitud-peso, de tal forma de evaluar los pesos observados a la talla en un intervalo de pesos a la talla definidos por el validador y que permiten proporcionar un criterio que distingue el peso observado como un valor esperable, fuera de lo esperado y extremo.
+
+```{r echo=FALSE}
+source('Code1.R')
+```
+
+```{r}
+#| label: fig-lp
+#| fig-lp: Datos simulados relación longitud-peso.
+dt_lp_error <- expand_grid(
+  n = 200,
+  a = 0.0001,
+  b = 2.9,
+  error = seq(0.5,1,0.1),
+  Talla = c(10, 120)) %>% 
+  group_by(n, a, b, error) %>% 
+  nest(.key = 'Tallas') %>% 
+  mutate(
+    datos_lp = purrr::map(Tallas, ~mod_lp(longitud = .$Talla, error = error, 
+                                          n = n, a = a, b = b, semilla = 2023))
+  )
+dt_lp_error %>% print(n = Inf)
+```
+
+@fig-lp Muestra simulaciones de la relación longitud-peso, considerando diferentes niveles de error. El modelo esta dado por $$
+  P = a*L^b*e^{(error)}.
+$$ {#eq-lp}
+
+```{r}
+dt_lp_error %>% 
+  ungroup() %>% 
+  select(-Tallas) %>% 
+  unnest(cols = datos_lp) %>% 
+  ggplot(aes(x = Talla, y = Peso, color = factor(error))) + 
+  geom_point(show.legend = FALSE) + 
+  geom_smooth(method = 'loess', show.legend = FALSE) +
+  facet_wrap(vars(factor(error)), scales = 'fixed') +
+  theme_minimal()
+```
+
+```{r}
+dt_lp_error %>% 
+  ungroup() %>% 
+  select(-Tallas) %>% 
+  unnest(cols = datos_lp) %>% 
+  ggplot(aes(x = cut_number(Talla, n = 5), y = sim_error, color = factor(error))) + 
+  geom_boxplot(show.legend = FALSE) + 
+  labs(x = 'Intervalos de Talla', y = 'Error simulado') +
+  facet_wrap(vars(factor(error)), scales = 'fixed') +
+  theme_minimal()
+```
